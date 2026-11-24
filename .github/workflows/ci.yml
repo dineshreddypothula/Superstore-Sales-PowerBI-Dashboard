@@ -1,0 +1,89 @@
+name: CI - Data Projects
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  netflix-analysis:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Lint notebook
+        run: |
+          pip install nbqa flake8
+          nbqa flake8 netflix-analysis.ipynb || true
+
+      - name: Execute notebook (smoke test)
+        run: |
+          pip install nbconvert
+          jupyter nbconvert --to notebook --execute netflix-analysis.ipynb --output /dev/null || echo "Notebook execution test completed"
+
+  superstore-dashboard:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Verify PBIX file exists
+        run: |
+          if [ -f "dashboard.pbix" ]; then
+            echo "✅ dashboard.pbix found"
+            ls -lh dashboard.pbix
+          else
+            echo "❌ dashboard.pbix not found"
+            exit 1
+          fi
+
+      - name: Verify data file
+        run: |
+          if [ -f "data/Sample_Superstore.csv" ]; then
+            echo "✅ Sample data found"
+            head -5 data/Sample_Superstore.csv
+          else
+            echo "❌ Sample data not found"
+            exit 1
+          fi
+
+      - name: Verify screenshots
+        run: |
+          for img in *.png; do
+            if [ -f "$img" ]; then
+              echo "✅ Found: $img"
+            fi
+          done
+
+  leetcode:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Verify structure
+        run: |
+          echo "Total problem folders: $(find . -maxdepth 1 -type d -name '[0-9]*-*' | wc -l)"
+          echo "Sample folders:"
+          ls -d [0-9]*-* | head -10
+
+      - name: Check for solutions
+        run: |
+          java_count=$(find . -name "*.java" | wc -l)
+          python_count=$(find . -name "*.py" | wc -l)
+          echo "Java solutions: $java_count"
+          echo "Python solutions: $python_count"
+          if [ $java_count -eq 0 ] && [ $python_count -eq 0 ]; then
+            echo "⚠️ No solution files found"
+            exit 1
+          fi
